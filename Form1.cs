@@ -3,17 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Math;
+
 
 namespace BallisticTask
 {
     public partial class Form1 : Form
     {
+        private const double GRAVITY = 9.81;
         private static double initialHeight;
         private static double initialSpeed;
         private static double angle;
         private static double airResistanceCoefficient;
         private static double timeInterval;
-        private static double gravity = 9.81;
         private double hMax;
         private double lMax;
         private double tMax;
@@ -21,10 +23,16 @@ namespace BallisticTask
         private double lMaxTeor;
         private double tMaxTeor;
         bool flag = true;
+       
+
+        public List<double> Xcoordinate { get; private set; } = new List<double>();
+        public List<double> Ycoordinate { get; private set; } = new List<double>();
+        public List<double> Time { get; private set; } = new List<double>();
 
         public Form1()
         {
             InitializeComponent();
+            
         }
 
         public void InputData()
@@ -45,19 +53,21 @@ namespace BallisticTask
         private void InitChart()
         {
             CalcInitialData();
-            chart1.ChartAreas[0].AxisX.Maximum = lMaxTeor + 1;
+            chart1.ChartAreas[0].AxisX.Maximum = lMaxTeor + 5;
             chart1.ChartAreas[0].AxisX.Minimum = 0;
             chart1.ChartAreas[0].AxisY.Minimum = -2;
             chart1.ChartAreas[0].AxisY.Maximum = hMaxTeor + 1;
+
+
         }
         public double[] CalcInitialData()
         {
             InputData();
-            lMaxTeor = initialSpeed * initialSpeed * Math.Sin(2 * angle * Math.PI / 180) / gravity;
-            hMaxTeor = initialSpeed * initialSpeed * Math.Sin(angle * Math.PI / 180) * Math.Sin(angle * Math.PI / 180) / 2 / gravity + initialHeight;
-            double _angleRadians = angle * Math.PI / 180;
-            double _horizontalSpeed = initialSpeed * Math.Cos(_angleRadians);
-            double _verticalSpeed = initialSpeed * Math.Sin(_angleRadians);
+            lMaxTeor = initialSpeed * initialSpeed * Sin(2 * angle * PI / 180) / GRAVITY;
+            hMaxTeor = initialSpeed * initialSpeed * Sin(angle * PI / 180) * Sin(angle * PI / 180) / 2 / GRAVITY + initialHeight;
+            double _angleRadians = angle * PI / 180;
+            double _horizontalSpeed = initialSpeed * Cos(_angleRadians);
+            double _verticalSpeed = initialSpeed * Sin(_angleRadians);
             double[] _initialState = { 0, initialHeight, _horizontalSpeed, _verticalSpeed }; // x, y, vx, vy
             return _initialState;
         }
@@ -69,11 +79,8 @@ namespace BallisticTask
         private async Task RungeKuttaSimulation(double[] _initialState, double _dt, double _airResistanceCoefficient)
         {
             flag = true;
-            double currentTime = 0;
+            double _currentTime = 0;
             double[] _currentState = _initialState;// {x, y, vx, vy}
-            List<double> h = new List<double>();
-            List<double> l = new List<double>();
-
             while (_currentState[1] >= 0 && flag == true)
             {
                 double[] k1 = Derivative(_currentState, _airResistanceCoefficient); // Derivate { vx, vy, ax, ay }
@@ -85,18 +92,30 @@ namespace BallisticTask
                     _currentState[i] += _dt * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) / 6;
 
                 }
-                currentTime += _dt;
-                h.Add(_currentState[1]);
-                l.Add(_currentState[0]);
-                hMax = h.Max();
-                lMax = l.Max();
-                tMax = currentTime;
-                chart1.Series[0].Points.AddXY(_currentState[0], _currentState[1]);
+                _currentTime += _dt;
+                CreateDataList(_currentTime, _currentState);
+                DrawInChart(_currentState);
+              
                 await Task.Delay(1);
             }
+        }
 
-
-
+        public void CreateDataList(double _currentTime, double[] _currentState)
+        {
+            Ycoordinate.Add(_currentState[1]);
+            Xcoordinate.Add(_currentState[0]);
+            Time.Add(_currentTime);
+        }
+       
+        private void FindMax ()
+        {
+            hMax = Ycoordinate.Max();
+            lMax = Xcoordinate.Max();
+            tMax = Time.Max();
+        }
+        private void DrawInChart(double[] _currentState)
+        {
+            chart1.Series[0].Points.AddXY(_currentState[0], _currentState[1]);
         }
         private static double[] Derivative(double[] state, double airResistanceCoefficient)
         {
@@ -104,7 +123,7 @@ namespace BallisticTask
             double vy = state[3];
 
             double ax = -airResistanceCoefficient * vx * Math.Sqrt(vx * vx + vy * vy);
-            double ay = -gravity - airResistanceCoefficient * vy * Math.Sqrt(vx * vx + vy * vy);
+            double ay = -GRAVITY - airResistanceCoefficient * vy * Math.Sqrt(vx * vx + vy * vy);
 
             return new double[] { vx, vy, ax, ay };
         }
@@ -165,6 +184,7 @@ namespace BallisticTask
 
         private void button1_Click(object sender, EventArgs e)
         {
+            FindMax();
             textBoxHMax.Text = hMax.ToString();
             textBoxLMax.Text = lMax.ToString();
             textBoxTMax.Text = tMax.ToString();
@@ -177,6 +197,13 @@ namespace BallisticTask
         private void buttonStop_Click(object sender, EventArgs e)
         {
             flag = false;
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            OutputDataForm outputData = new OutputDataForm(this);
+            outputData.Show();
+            
         }
     }
 
